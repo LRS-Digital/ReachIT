@@ -36,12 +36,7 @@ export class ConnectController {
     @Query('code') code: string,
     @Query('state') userId: string,
     @Res() res: Response,
-    @Req() req: Request,
   ) {
-    console.log(
-      `DEBUG Callback-Aufruf: ${new Date().toISOString()} | User-Agent: ${req.headers['user-agent']} | IP: ${req.ip} | Code-Anfang: ${code?.substring(0, 15)}`,
-    );
-
     if (!code) {
       return res.status(400).send('Kein Autorisierungscode erhalten.');
     }
