@@ -4,6 +4,9 @@ import axios from 'axios';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
 
+const INSTAGRAM_REDIRECT_URI =
+  'https://reachit-backend-production.up.railway.app/connect/instagram/callback';
+
 @Controller('connect')
 export class ConnectController {
   constructor(
@@ -16,7 +19,7 @@ export class ConnectController {
   connectInstagram(@Query('userId') userId: string, @Res() res: Response) {
     const params = new URLSearchParams({
       client_id: process.env.INSTAGRAM_CLIENT_ID!,
-      redirect_uri: process.env.INSTAGRAM_REDIRECT_URI!,
+      redirect_uri: INSTAGRAM_REDIRECT_URI,
       response_type: 'code',
       scope: 'instagram_business_basic,instagram_business_content_publish',
       state: userId, // so wissen wir im Callback, welcher ReachIT-Nutzer das war
@@ -46,7 +49,7 @@ export class ConnectController {
           client_id: process.env.INSTAGRAM_CLIENT_ID!,
           client_secret: process.env.INSTAGRAM_CLIENT_SECRET!,
           grant_type: 'authorization_code',
-          redirect_uri: process.env.INSTAGRAM_REDIRECT_URI!,
+          redirect_uri: INSTAGRAM_REDIRECT_URI,
           code,
         }),
       );
