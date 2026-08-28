@@ -30,13 +30,6 @@ export class TiktokConnectController {
   // Schritt 1: Nutzer klickt "TikTok verbinden" -> Redirect zu TikTok
   @Get('tiktok')
   async connectTiktok(@Query('userId') userId: string, @Res() res: Response) {
-    console.log(
-      'DEBUG TIKTOK_CLIENT_KEY Länge:',
-      process.env.TIKTOK_CLIENT_KEY?.length,
-      '| Anfang:',
-      process.env.TIKTOK_CLIENT_KEY?.substring(0, 6),
-    );
-
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
     const state = crypto.randomBytes(16).toString('hex');

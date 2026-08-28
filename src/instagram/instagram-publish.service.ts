@@ -25,17 +25,26 @@ export class InstagramPublishService {
     return response.data.id;
   }
 
+  /**
+   * Erstellt einen Video-Container. Instagram veröffentlicht alle Videos
+   * technisch als "Reel" (media_type=REELS) - es gibt keinen separaten
+   * klassischen Feed-Video-Endpunkt mehr. Über shareToFeed steuerst du,
+   * ob das Video zusätzlich im normalen Feed-Grid erscheint (true) oder
+   * nur im Reels-Tab sichtbar ist (false).
+   */
   async createReelContainer(
     igUserId: string,
     accessToken: string,
     videoUrl: string,
     caption: string,
+    shareToFeed: boolean = true,
   ): Promise<string> {
     const response = await axios.post(`${GRAPH_BASE}/${igUserId}/media`, null, {
       params: {
         media_type: 'REELS',
         video_url: videoUrl,
         caption,
+        share_to_feed: shareToFeed,
         access_token: accessToken,
       },
     });

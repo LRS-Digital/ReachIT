@@ -12,6 +12,7 @@ import type { Response } from 'express';
 import { R2Service } from '../storage/r2.service.js';
 import { InstagramPublishService } from '../instagram/instagram-publish.service.js';
 import { TiktokPublishService } from '../tiktok/tiktok-publish.service.js';
+import { ThreadsPublishService } from '../threads/threads-publish.service.js';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
 
@@ -21,6 +22,7 @@ export class PostsController {
     private readonly r2: R2Service,
     private readonly instagram: InstagramPublishService,
     private readonly tiktok: TiktokPublishService,
+    private readonly threads: ThreadsPublishService,
     private readonly supabase: SupabaseService,
     private readonly encryption: EncryptionService,
   ) {}
@@ -77,6 +79,7 @@ export class PostsController {
     @UploadedFile() file: Express.Multer.File,
     @Body('userId') userId: string,
     @Body('caption') caption: string,
+    @Body('shareToFeed') shareToFeed: string,
     @Res() res: Response,
   ) {
     if (!file) {
@@ -93,11 +96,14 @@ export class PostsController {
       const accessToken = this.encryption.decrypt(account.access_token);
       const videoUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
 
+      const shouldShareToFeed = shareToFeed !== 'false';
+
       const containerId = await this.instagram.createReelContainer(
         account.platform_user_id,
         accessToken,
         videoUrl,
         caption ?? '',
+        shouldShareToFeed,
       );
 
       await this.instagram.waitUntilReady(containerId, accessToken);
@@ -149,6 +155,55 @@ export class PostsController {
       return res.json({ success: true, publishId });
     } catch (err) {
       console.error('TikTok Post Fehler:', err);
+      return res.status(500).json({ error: 'Posten fehlgeschlagen.' });
+    }
+  }
+
+  // Threads Post (Text, optional mit Bild)
+  @Post('threads')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async postToThreads(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('userId') userId: string,
+    @Body('text') text: string,
+    @Res() res: Response,
+  ) {
+    if (!userId) {
+      return res.status(400).json({ error: 'Keine userId angegeben.' });
+    }
+    if (!text && !file) {
+      return res
+        .status(400)
+        .json({ error: 'Entweder Text oder Bild wird benötigt.' });
+    }
+
+    try {
+      const account = await this.getConnectedAccount(userId, 'threads', res);
+      if (!account) return;
+
+      const accessToken = this.encryption.decrypt(account.access_token);
+
+      let imageUrl: string | undefined;
+      if (file) {
+        imageUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
+      }
+
+      const containerId = await this.threads.createContainer(
+        account.platform_user_id,
+        accessToken,
+        text ?? '',
+        imageUrl,
+      );
+
+      const postId = await this.threads.publishContainer(
+        account.platform_user_id,
+        accessToken,
+        containerId,
+      );
+
+      return res.json({ success: true, postId });
+    } catch (err) {
+      console.error('Threads Post Fehler:', err);
       return res.status(500).json({ error: 'Posten fehlgeschlagen.' });
     }
   }
