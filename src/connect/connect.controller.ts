@@ -26,7 +26,7 @@ export class ConnectController {
     });
 
     return res.redirect(
-      `https://www.instagram.com/oauth/authorize?${params.toString()}`,
+      `https://api.instagram.com/oauth/authorize?${params.toString()}`,
     );
   }
 
