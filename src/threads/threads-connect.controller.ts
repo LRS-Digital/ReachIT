@@ -26,7 +26,7 @@ export class ThreadsConnectController {
     });
 
     return res.redirect(
-      `https://threads.net/oauth/authorize?${params.toString()}`,
+      `https://www.threads.net/oauth/authorize?${params.toString()}`,
     );
   }
 
