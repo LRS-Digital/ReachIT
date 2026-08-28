@@ -6,10 +6,10 @@ const GRAPH_BASE = 'https://graph.instagram.com';
 @Injectable()
 export class InstagramPublishService {
   /**
-   * Schritt 1: Instagram lädt das Bild von imageUrl herunter und erstellt
-   * einen "Media Container" (noch nicht veröffentlicht).
+   * Schritt 1: Erstellt einen "Media Container" - entweder ein Bild
+   * (Feed-Post) oder ein Reel (Video).
    */
-  async createContainer(
+  async createImageContainer(
     igUserId: string,
     accessToken: string,
     imageUrl: string,
@@ -22,15 +22,33 @@ export class InstagramPublishService {
         access_token: accessToken,
       },
     });
-    return response.data.id; // Container-ID
+    return response.data.id;
+  }
+
+  async createReelContainer(
+    igUserId: string,
+    accessToken: string,
+    videoUrl: string,
+    caption: string,
+  ): Promise<string> {
+    const response = await axios.post(`${GRAPH_BASE}/${igUserId}/media`, null, {
+      params: {
+        media_type: 'REELS',
+        video_url: videoUrl,
+        caption,
+        access_token: accessToken,
+      },
+    });
+    return response.data.id;
   }
 
   /**
-   * Schritt 2: Wartet, bis Instagram das Bild fertig verarbeitet hat.
-   * Fragt alle 3 Sekunden den Status ab (max. 20 Versuche = ~1 Minute).
+   * Schritt 2: Wartet, bis Instagram das Medium fertig verarbeitet hat.
+   * Reels brauchen länger als Bilder (bis zu mehreren Minuten laut Meta),
+   * daher großzügigeres Polling-Intervall und Timeout.
    */
   async waitUntilReady(containerId: string, accessToken: string): Promise<void> {
-    const maxAttempts = 20;
+    const maxAttempts = 40; // 40 x 5s = ~3,3 Minuten Timeout
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const response = await axios.get(`${GRAPH_BASE}/${containerId}`, {
@@ -44,14 +62,14 @@ export class InstagramPublishService {
         throw new Error('Instagram konnte das Medium nicht verarbeiten.');
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
 
     throw new Error('Timeout: Instagram hat das Medium nicht rechtzeitig verarbeitet.');
   }
 
   /**
-   * Schritt 3: Veröffentlicht den fertigen Container als echten Post.
+   * Schritt 3: Veröffentlicht den fertigen Container als echten Post/Reel.
    */
   async publishContainer(
     igUserId: string,
@@ -68,6 +86,6 @@ export class InstagramPublishService {
         },
       },
     );
-    return response.data.id; // veröffentlichte Media-ID
+    return response.data.id;
   }
 }

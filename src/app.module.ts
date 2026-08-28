@@ -4,9 +4,10 @@ import { AppService } from './app.service.js';
 import { ConnectModule } from './connect/connect.module.js';
 import { PostsModule } from './posts/posts.module.js';
 import { LegalModule } from './legal/legal.module.js';
+import { TiktokModule } from './tiktok/tiktok.module.js';
 
 @Module({
-  imports: [ConnectModule, PostsModule, LegalModule],
+  imports: [ConnectModule, PostsModule, LegalModule, TiktokModule],
   controllers: [AppController],
   providers: [AppService],
 })
