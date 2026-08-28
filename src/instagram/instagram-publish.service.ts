@@ -15,13 +15,6 @@ export class InstagramPublishService {
     imageUrl: string,
     caption: string,
   ): Promise<string> {
-    // DEBUG: Prüfen, welche ID das Token tatsächlich für sich selbst meldet
-    const meResponse = await axios.get(`${GRAPH_BASE}/me`, {
-      params: { fields: 'id,username', access_token: accessToken },
-    });
-    console.log('DEBUG /me Antwort:', JSON.stringify(meResponse.data));
-    console.log('DEBUG gespeicherte platform_user_id:', igUserId);
-
     const response = await axios.post(`${GRAPH_BASE}/${igUserId}/media`, null, {
       params: {
         image_url: imageUrl,

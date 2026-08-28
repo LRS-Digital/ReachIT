@@ -43,6 +43,10 @@ export class ConnectController {
 
     try {
       // Code gegen kurzlebiges Access Token tauschen
+      // WICHTIG: Antwort als Rohtext lesen (nicht automatisch als JSON parsen),
+      // da Instagram-IDs 17-stellig sind und JavaScript beim normalen
+      // JSON.parse große Zahlen ungenau rundet (Number.MAX_SAFE_INTEGER
+      // hat nur 16 Stellen). Per Regex extrahieren wir die exakte Ziffernfolge.
       const tokenResponse = await axios.post(
         'https://api.instagram.com/oauth/access_token',
         new URLSearchParams({
@@ -52,10 +56,24 @@ export class ConnectController {
           redirect_uri: INSTAGRAM_REDIRECT_URI,
           code,
         }),
+        {
+          responseType: 'text',
+          transformResponse: [(data) => data], // verhindert automatisches JSON.parse
+        },
       );
 
-      const { access_token: shortLivedToken, user_id: platformUserId } =
-        tokenResponse.data;
+      const rawBody: string = tokenResponse.data;
+      const accessTokenMatch = rawBody.match(/"access_token"\s*:\s*"([^"]+)"/);
+      const userIdMatch = rawBody.match(/"user_id"\s*:\s*"?(\d+)"?/);
+
+      if (!accessTokenMatch || !userIdMatch) {
+        throw new Error(
+          `Konnte access_token oder user_id nicht aus der Antwort extrahieren: ${rawBody}`,
+        );
+      }
+
+      const shortLivedToken = accessTokenMatch[1];
+      const platformUserId = userIdMatch[1]; // exakte Ziffernfolge als String
 
       // Kurzlebiges gegen langlebiges Token (60 Tage) tauschen
       const longLivedResponse = await axios.get(
