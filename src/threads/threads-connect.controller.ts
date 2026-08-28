@@ -25,9 +25,10 @@ export class ThreadsConnectController {
       state: userId,
     });
 
-    return res.redirect(
-      `https://www.threads.net/oauth/authorize?${params.toString()}`,
-    );
+    const authorizeUrl = `https://www.threads.com/oauth/authorize?${params.toString()}`;
+    console.log('DEBUG Threads Autorisierungs-URL:', authorizeUrl);
+
+    return res.redirect(authorizeUrl);
   }
 
   // Schritt 2: Threads leitet mit "code" hierher zurück
