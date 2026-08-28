@@ -6,22 +6,27 @@ const GRAPH_BASE = 'https://graph.threads.net';
 @Injectable()
 export class ThreadsPublishService {
   /**
-   * Schritt 1: Erstellt einen Post-Container (Text oder Bild).
+   * Schritt 1: Erstellt einen Post-Container (Text, Bild oder Video).
+   * Es darf höchstens EINE der beiden URLs gesetzt sein.
    */
   async createContainer(
     threadsUserId: string,
     accessToken: string,
     text: string,
     imageUrl?: string,
+    videoUrl?: string,
   ): Promise<string> {
     const params: Record<string, string> = {
-      media_type: imageUrl ? 'IMAGE' : 'TEXT',
+      media_type: videoUrl ? 'VIDEO' : imageUrl ? 'IMAGE' : 'TEXT',
       text,
       access_token: accessToken,
     };
 
     if (imageUrl) {
       params.image_url = imageUrl;
+    }
+    if (videoUrl) {
+      params.video_url = videoUrl;
     }
 
     const response = await axios.post(
@@ -30,6 +35,36 @@ export class ThreadsPublishService {
       { params },
     );
     return response.data.id;
+  }
+
+  /**
+   * Nur für Videos nötig: Threads verarbeitet Videos asynchron.
+   * Bilder werden laut Meta sofort verarbeitet, brauchen kein Warten.
+   * Status-Feld heißt bei Threads "status" (nicht "status_code" wie bei
+   * Instagram). Meta empfiehlt ca. einmal pro Minute für max. 5 Minuten
+   * abzufragen.
+   */
+  async waitUntilReady(containerId: string, accessToken: string): Promise<void> {
+    const maxAttempts = 5;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const response = await axios.get(`${GRAPH_BASE}/${containerId}`, {
+        params: { fields: 'status,error_message', access_token: accessToken },
+      });
+
+      const status = response.data.status;
+
+      if (status === 'FINISHED') return;
+      if (status === 'ERROR') {
+        throw new Error(
+          `Threads konnte das Video nicht verarbeiten: ${response.data.error_message}`,
+        );
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 60000));
+    }
+
+    throw new Error('Timeout: Threads hat das Video nicht rechtzeitig verarbeitet.');
   }
 
   /**

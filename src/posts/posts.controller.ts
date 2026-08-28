@@ -174,7 +174,7 @@ export class PostsController {
     if (!text && !file) {
       return res
         .status(400)
-        .json({ error: 'Entweder Text oder Bild wird benötigt.' });
+        .json({ error: 'Entweder Text oder ein Bild/Video wird benötigt.' });
     }
 
     try {
@@ -184,8 +184,15 @@ export class PostsController {
       const accessToken = this.encryption.decrypt(account.access_token);
 
       let imageUrl: string | undefined;
+      let videoUrl: string | undefined;
+
       if (file) {
-        imageUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
+        const uploadedUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
+        if (file.mimetype.startsWith('video/')) {
+          videoUrl = uploadedUrl;
+        } else {
+          imageUrl = uploadedUrl;
+        }
       }
 
       const containerId = await this.threads.createContainer(
@@ -193,7 +200,13 @@ export class PostsController {
         accessToken,
         text ?? '',
         imageUrl,
+        videoUrl,
       );
+
+      // Nur Videos brauchen Verarbeitungszeit, Bilder sind sofort bereit
+      if (videoUrl) {
+        await this.threads.waitUntilReady(containerId, accessToken);
+      }
 
       const postId = await this.threads.publishContainer(
         account.platform_user_id,
