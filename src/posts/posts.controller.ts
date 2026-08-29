@@ -13,6 +13,7 @@ import { R2Service } from '../storage/r2.service.js';
 import { InstagramPublishService } from '../instagram/instagram-publish.service.js';
 import { TiktokPublishService } from '../tiktok/tiktok-publish.service.js';
 import { ThreadsPublishService } from '../threads/threads-publish.service.js';
+import { LinkedinPublishService } from '../linkedin/linkedin-publish.service.js';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
 
@@ -23,6 +24,7 @@ export class PostsController {
     private readonly instagram: InstagramPublishService,
     private readonly tiktok: TiktokPublishService,
     private readonly threads: ThreadsPublishService,
+    private readonly linkedin: LinkedinPublishService,
     private readonly supabase: SupabaseService,
     private readonly encryption: EncryptionService,
   ) {}
@@ -217,6 +219,53 @@ export class PostsController {
       return res.json({ success: true, postId });
     } catch (err) {
       console.error('Threads Post Fehler:', err);
+      return res.status(500).json({ error: 'Posten fehlgeschlagen.' });
+    }
+  }
+
+
+  // LinkedIn Post (Text, optional mit Bild)
+  @Post('linkedin')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async postToLinkedin(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('userId') userId: string,
+    @Body('text') text: string,
+    @Res() res: Response,
+  ) {
+    if (!userId) {
+      return res.status(400).json({ error: 'Keine userId angegeben.' });
+    }
+    if (!text) {
+      return res.status(400).json({ error: 'Text wird benötigt.' });
+    }
+
+    try {
+      const account = await this.getConnectedAccount(userId, 'linkedin', res);
+      if (!account) return;
+
+      const accessToken = this.encryption.decrypt(account.access_token);
+      const personUrn = `urn:li:person:${account.platform_user_id}`;
+
+      let imageUrn: string | undefined;
+      if (file) {
+        imageUrn = await this.linkedin.uploadImage(
+          personUrn,
+          accessToken,
+          file.buffer,
+        );
+      }
+
+      const postUrn = await this.linkedin.createPost(
+        personUrn,
+        accessToken,
+        text,
+        imageUrn,
+      );
+
+      return res.json({ success: true, postUrn });
+    } catch (err) {
+      console.error('LinkedIn Post Fehler:', err);
       return res.status(500).json({ error: 'Posten fehlgeschlagen.' });
     }
   }
