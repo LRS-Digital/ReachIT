@@ -7,6 +7,7 @@ import { ThreadsPublishService } from '../threads/threads-publish.service.js';
 import { LinkedinPublishService } from '../linkedin/linkedin-publish.service.js';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
+import { PostLogService } from './post-log.service.js';
 
 @Module({
   controllers: [PostsController],
@@ -18,6 +19,7 @@ import { EncryptionService } from '../crypto/encryption.service.js';
     LinkedinPublishService,
     SupabaseService,
     EncryptionService,
+    PostLogService,
   ],
 })
 export class PostsModule {}

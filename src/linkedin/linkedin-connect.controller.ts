@@ -6,6 +6,7 @@ import { EncryptionService } from '../crypto/encryption.service.js';
 
 const LINKEDIN_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/linkedin/callback';
+const LINKEDIN_SCOPES = 'openid profile w_member_social';
 
 @Controller('connect')
 export class LinkedinConnectController {
@@ -22,7 +23,7 @@ export class LinkedinConnectController {
       client_id: process.env.LINKEDIN_CLIENT_ID!,
       redirect_uri: LINKEDIN_REDIRECT_URI,
       state: userId,
-      scope: 'openid profile w_member_social',
+      scope: LINKEDIN_SCOPES,
     });
 
     return res.redirect(
@@ -77,6 +78,7 @@ export class LinkedinConnectController {
             platform: 'linkedin',
             platform_user_id: platformUserId,
             access_token: this.encryption.encrypt(accessToken),
+            scopes: LINKEDIN_SCOPES,
             expires_at: expiresAt.toISOString(),
             connected_at: new Date().toISOString(),
           },

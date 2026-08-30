@@ -8,6 +8,7 @@ import { RedisService } from '../redis/redis.service.js';
 
 const TIKTOK_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/tiktok/callback';
+const TIKTOK_SCOPES = 'user.info.basic,video.publish,video.upload';
 
 const PKCE_TTL_SECONDS = 10 * 60; // 10 Minuten
 
@@ -44,7 +45,7 @@ export class TiktokConnectController {
     const params = new URLSearchParams({
       client_key: process.env.TIKTOK_CLIENT_KEY!,
       response_type: 'code',
-      scope: 'user.info.basic,video.publish,video.upload',
+      scope: TIKTOK_SCOPES,
       redirect_uri: TIKTOK_REDIRECT_URI,
       state,
       code_challenge: codeChallenge,
@@ -111,6 +112,7 @@ export class TiktokConnectController {
             platform_user_id: String(openId),
             access_token: this.encryption.encrypt(accessToken),
             refresh_token: this.encryption.encrypt(refreshToken),
+            scopes: TIKTOK_SCOPES,
             expires_at: expiresAt.toISOString(),
             connected_at: new Date().toISOString(),
           },

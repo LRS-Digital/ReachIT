@@ -6,6 +6,8 @@ import { EncryptionService } from '../crypto/encryption.service.js';
 
 const INSTAGRAM_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/instagram/callback';
+const INSTAGRAM_SCOPES =
+  'instagram_business_basic,instagram_business_content_publish';
 
 @Controller('connect')
 export class ConnectController {
@@ -21,7 +23,7 @@ export class ConnectController {
       client_id: process.env.INSTAGRAM_CLIENT_ID!,
       redirect_uri: INSTAGRAM_REDIRECT_URI,
       response_type: 'code',
-      scope: 'instagram_business_basic,instagram_business_content_publish',
+      scope: INSTAGRAM_SCOPES,
       state: userId, // so wissen wir im Callback, welcher ReachIT-Nutzer das war
     });
 
@@ -101,6 +103,7 @@ export class ConnectController {
             platform: 'instagram',
             platform_user_id: String(platformUserId),
             access_token: this.encryption.encrypt(longLivedToken),
+            scopes: INSTAGRAM_SCOPES,
             expires_at: expiresAt.toISOString(),
             connected_at: new Date().toISOString(),
           },

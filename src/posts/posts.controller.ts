@@ -16,6 +16,7 @@ import { ThreadsPublishService } from '../threads/threads-publish.service.js';
 import { LinkedinPublishService } from '../linkedin/linkedin-publish.service.js';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
+import { PostLogService } from './post-log.service.js';
 
 @Controller('posts')
 export class PostsController {
@@ -27,6 +28,7 @@ export class PostsController {
     private readonly linkedin: LinkedinPublishService,
     private readonly supabase: SupabaseService,
     private readonly encryption: EncryptionService,
+    private readonly postLog: PostLogService,
   ) {}
 
   // Instagram Feed-Post (Bild)
@@ -44,6 +46,8 @@ export class PostsController {
     if (!userId) {
       return res.status(400).json({ error: 'Keine userId angegeben.' });
     }
+
+    const startTime = Date.now();
 
     try {
       const account = await this.getConnectedAccount(userId, 'instagram', res);
@@ -67,9 +71,32 @@ export class PostsController {
         containerId,
       );
 
+      await this.postLog.logAttempt({
+        userId,
+        caption: caption ?? '',
+        mediaType: 'image',
+        platform: 'instagram',
+        status: 'success',
+        externalId: mediaId,
+        fileSizeBytes: file.size,
+        mimeType: file.mimetype,
+        durationMs: Date.now() - startTime,
+      });
+
       return res.json({ success: true, mediaId });
     } catch (err) {
       console.error('Instagram Post Fehler:', err);
+      await this.postLog.logAttempt({
+        userId,
+        caption: caption ?? '',
+        mediaType: 'image',
+        platform: 'instagram',
+        status: 'failed',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        fileSizeBytes: file?.size,
+        mimeType: file?.mimetype,
+        durationMs: Date.now() - startTime,
+      });
       return res.status(500).json({ error: 'Posten fehlgeschlagen.' });
     }
   }
@@ -90,6 +117,8 @@ export class PostsController {
     if (!userId) {
       return res.status(400).json({ error: 'Keine userId angegeben.' });
     }
+
+    const startTime = Date.now();
 
     try {
       const account = await this.getConnectedAccount(userId, 'instagram', res);
@@ -116,9 +145,32 @@ export class PostsController {
         containerId,
       );
 
+      await this.postLog.logAttempt({
+        userId,
+        caption: caption ?? '',
+        mediaType: 'video',
+        platform: 'instagram',
+        status: 'success',
+        externalId: mediaId,
+        fileSizeBytes: file.size,
+        mimeType: file.mimetype,
+        durationMs: Date.now() - startTime,
+      });
+
       return res.json({ success: true, mediaId });
     } catch (err) {
       console.error('Instagram Reel Fehler:', err);
+      await this.postLog.logAttempt({
+        userId,
+        caption: caption ?? '',
+        mediaType: 'video',
+        platform: 'instagram',
+        status: 'failed',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        fileSizeBytes: file?.size,
+        mimeType: file?.mimetype,
+        durationMs: Date.now() - startTime,
+      });
       return res.status(500).json({ error: 'Reel-Posten fehlgeschlagen.' });
     }
   }
@@ -139,6 +191,8 @@ export class PostsController {
       return res.status(400).json({ error: 'Keine userId angegeben.' });
     }
 
+    const startTime = Date.now();
+
     try {
       const account = await this.getConnectedAccount(userId, 'tiktok', res);
       if (!account) return;
@@ -154,14 +208,37 @@ export class PostsController {
       await this.tiktok.uploadVideoChunks(uploadUrl, file.buffer);
       await this.tiktok.waitUntilPublished(publishId, accessToken);
 
+      await this.postLog.logAttempt({
+        userId,
+        caption: caption ?? '',
+        mediaType: 'video',
+        platform: 'tiktok',
+        status: 'success',
+        externalId: publishId,
+        fileSizeBytes: file.size,
+        mimeType: file.mimetype,
+        durationMs: Date.now() - startTime,
+      });
+
       return res.json({ success: true, publishId });
     } catch (err) {
       console.error('TikTok Post Fehler:', err);
+      await this.postLog.logAttempt({
+        userId,
+        caption: caption ?? '',
+        mediaType: 'video',
+        platform: 'tiktok',
+        status: 'failed',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        fileSizeBytes: file?.size,
+        mimeType: file?.mimetype,
+        durationMs: Date.now() - startTime,
+      });
       return res.status(500).json({ error: 'Posten fehlgeschlagen.' });
     }
   }
 
-  // Threads Post (Text, optional mit Bild)
+  // Threads Post (Text, optional mit Bild/Video)
   @Post('threads')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async postToThreads(
@@ -179,6 +256,16 @@ export class PostsController {
         .json({ error: 'Entweder Text oder ein Bild/Video wird benötigt.' });
     }
 
+    // Für das Logging brauchen wir den Media-Typ auch im Fehlerfall,
+    // deshalb außerhalb des try-Blocks bestimmen.
+    const mediaType: 'text' | 'image' | 'video' = file
+      ? file.mimetype.startsWith('video/')
+        ? 'video'
+        : 'image'
+      : 'text';
+
+    const startTime = Date.now();
+
     try {
       const account = await this.getConnectedAccount(userId, 'threads', res);
       if (!account) return;
@@ -190,7 +277,7 @@ export class PostsController {
 
       if (file) {
         const uploadedUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
-        if (file.mimetype.startsWith('video/')) {
+        if (mediaType === 'video') {
           videoUrl = uploadedUrl;
         } else {
           imageUrl = uploadedUrl;
@@ -216,13 +303,35 @@ export class PostsController {
         containerId,
       );
 
+      await this.postLog.logAttempt({
+        userId,
+        caption: text ?? '',
+        mediaType,
+        platform: 'threads',
+        status: 'success',
+        externalId: postId,
+        fileSizeBytes: file?.size,
+        mimeType: file?.mimetype,
+        durationMs: Date.now() - startTime,
+      });
+
       return res.json({ success: true, postId });
     } catch (err) {
       console.error('Threads Post Fehler:', err);
+      await this.postLog.logAttempt({
+        userId,
+        caption: text ?? '',
+        mediaType,
+        platform: 'threads',
+        status: 'failed',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        fileSizeBytes: file?.size,
+        mimeType: file?.mimetype,
+        durationMs: Date.now() - startTime,
+      });
       return res.status(500).json({ error: 'Posten fehlgeschlagen.' });
     }
   }
-
 
   // LinkedIn Post (Text, optional mit Bild)
   @Post('linkedin')
@@ -239,6 +348,10 @@ export class PostsController {
     if (!text) {
       return res.status(400).json({ error: 'Text wird benötigt.' });
     }
+
+    const mediaType: 'text' | 'image' = file ? 'image' : 'text';
+
+    const startTime = Date.now();
 
     try {
       const account = await this.getConnectedAccount(userId, 'linkedin', res);
@@ -263,9 +376,32 @@ export class PostsController {
         imageUrn,
       );
 
+      await this.postLog.logAttempt({
+        userId,
+        caption: text,
+        mediaType,
+        platform: 'linkedin',
+        status: 'success',
+        externalId: postUrn,
+        fileSizeBytes: file?.size,
+        mimeType: file?.mimetype,
+        durationMs: Date.now() - startTime,
+      });
+
       return res.json({ success: true, postUrn });
     } catch (err) {
       console.error('LinkedIn Post Fehler:', err);
+      await this.postLog.logAttempt({
+        userId,
+        caption: text,
+        mediaType,
+        platform: 'linkedin',
+        status: 'failed',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        fileSizeBytes: file?.size,
+        mimeType: file?.mimetype,
+        durationMs: Date.now() - startTime,
+      });
       return res.status(500).json({ error: 'Posten fehlgeschlagen.' });
     }
   }

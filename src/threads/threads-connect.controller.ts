@@ -7,6 +7,7 @@ import { EncryptionService } from '../crypto/encryption.service.js';
 
 const THREADS_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/threads/callback';
+const THREADS_SCOPES = 'threads_basic,threads_content_publish,threads_delete';
 
 /**
  * Entschlüsselt und verifiziert Metas "signed_request"-Format
@@ -51,7 +52,7 @@ export class ThreadsConnectController {
     const params = new URLSearchParams({
       client_id: process.env.THREADS_CLIENT_ID!,
       redirect_uri: THREADS_REDIRECT_URI,
-      scope: 'threads_basic,threads_content_publish',
+      scope: THREADS_SCOPES,
       response_type: 'code',
       state: userId,
     });
@@ -125,6 +126,7 @@ export class ThreadsConnectController {
             platform: 'threads',
             platform_user_id: platformUserId,
             access_token: this.encryption.encrypt(longLivedToken),
+            scopes: THREADS_SCOPES,
             expires_at: expiresAt.toISOString(),
             connected_at: new Date().toISOString(),
           },
