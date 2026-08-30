@@ -21,6 +21,8 @@ interface LogAttemptParams {
   fileSizeBytes?: number;
   mimeType?: string;
   durationMs?: number;
+  verified?: boolean;
+  postUrl?: string;
 }
 
 @Injectable()
@@ -45,6 +47,8 @@ export class PostLogService {
       fileSizeBytes,
       mimeType,
       durationMs,
+      verified,
+      postUrl,
     } = params;
 
     const { data: post, error: postError } = await this.supabase.client
@@ -74,6 +78,8 @@ export class PostLogService {
         external_id: externalId ?? null,
         error_message: errorMessage ?? null,
         duration_ms: durationMs ?? null,
+        verified: verified ?? false,
+        post_url: postUrl ?? null,
       });
 
     if (targetError) {

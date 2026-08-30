@@ -71,6 +71,9 @@ export class PostsController {
         containerId,
       );
 
+      // Echte Bestätigung: nachfragen, ob der Post wirklich existiert
+      const verifyResult = await this.instagram.verifyPost(mediaId, accessToken);
+
       await this.postLog.logAttempt({
         userId,
         caption: caption ?? '',
@@ -81,9 +84,16 @@ export class PostsController {
         fileSizeBytes: file.size,
         mimeType: file.mimetype,
         durationMs: Date.now() - startTime,
+        verified: verifyResult.verified,
+        postUrl: verifyResult.permalink,
       });
 
-      return res.json({ success: true, mediaId });
+      return res.json({
+        success: true,
+        mediaId,
+        verified: verifyResult.verified,
+        postUrl: verifyResult.permalink,
+      });
     } catch (err) {
       console.error('Instagram Post Fehler:', err);
       await this.postLog.logAttempt({
@@ -145,6 +155,8 @@ export class PostsController {
         containerId,
       );
 
+      const verifyResult = await this.instagram.verifyPost(mediaId, accessToken);
+
       await this.postLog.logAttempt({
         userId,
         caption: caption ?? '',
@@ -155,9 +167,16 @@ export class PostsController {
         fileSizeBytes: file.size,
         mimeType: file.mimetype,
         durationMs: Date.now() - startTime,
+        verified: verifyResult.verified,
+        postUrl: verifyResult.permalink,
       });
 
-      return res.json({ success: true, mediaId });
+      return res.json({
+        success: true,
+        mediaId,
+        verified: verifyResult.verified,
+        postUrl: verifyResult.permalink,
+      });
     } catch (err) {
       console.error('Instagram Reel Fehler:', err);
       await this.postLog.logAttempt({
@@ -208,6 +227,8 @@ export class PostsController {
       await this.tiktok.uploadVideoChunks(uploadUrl, file.buffer);
       await this.tiktok.waitUntilPublished(publishId, accessToken);
 
+      // TikToks Status-Polling bis PUBLISH_COMPLETE IST bereits die
+      // echte Bestätigung - kein zusätzlicher Call nötig
       await this.postLog.logAttempt({
         userId,
         caption: caption ?? '',
@@ -218,9 +239,10 @@ export class PostsController {
         fileSizeBytes: file.size,
         mimeType: file.mimetype,
         durationMs: Date.now() - startTime,
+        verified: true,
       });
 
-      return res.json({ success: true, publishId });
+      return res.json({ success: true, publishId, verified: true });
     } catch (err) {
       console.error('TikTok Post Fehler:', err);
       await this.postLog.logAttempt({
@@ -303,6 +325,8 @@ export class PostsController {
         containerId,
       );
 
+      const verifyResult = await this.threads.verifyPost(postId, accessToken);
+
       await this.postLog.logAttempt({
         userId,
         caption: text ?? '',
@@ -313,9 +337,16 @@ export class PostsController {
         fileSizeBytes: file?.size,
         mimeType: file?.mimetype,
         durationMs: Date.now() - startTime,
+        verified: verifyResult.verified,
+        postUrl: verifyResult.permalink,
       });
 
-      return res.json({ success: true, postId });
+      return res.json({
+        success: true,
+        postId,
+        verified: verifyResult.verified,
+        postUrl: verifyResult.permalink,
+      });
     } catch (err) {
       console.error('Threads Post Fehler:', err);
       await this.postLog.logAttempt({
@@ -376,6 +407,8 @@ export class PostsController {
         imageUrn,
       );
 
+      const verifyResult = await this.linkedin.verifyPost(postUrn, accessToken);
+
       await this.postLog.logAttempt({
         userId,
         caption: text,
@@ -386,9 +419,16 @@ export class PostsController {
         fileSizeBytes: file?.size,
         mimeType: file?.mimetype,
         durationMs: Date.now() - startTime,
+        verified: verifyResult.verified,
+        postUrl: verifyResult.permalink,
       });
 
-      return res.json({ success: true, postUrn });
+      return res.json({
+        success: true,
+        postUrn,
+        verified: verifyResult.verified,
+        postUrl: verifyResult.permalink,
+      });
     } catch (err) {
       console.error('LinkedIn Post Fehler:', err);
       await this.postLog.logAttempt({

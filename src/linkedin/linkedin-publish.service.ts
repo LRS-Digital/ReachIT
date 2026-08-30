@@ -76,4 +76,29 @@ export class LinkedinPublishService {
     // Die Post-ID kommt bei LinkedIn im Response-Header, nicht im Body
     return response.headers['x-restli-id'];
   }
+
+  /**
+   * Fragt nach dem Veröffentlichen aktiv zurück, ob der Post wirklich
+   * existiert (echte Bestätigung statt nur der ersten API-Antwort zu
+   * vertrauen). Der Permalink lässt sich bei LinkedIn direkt aus der
+   * URN konstruieren, sobald die GET-Anfrage erfolgreich ist.
+   */
+  async verifyPost(
+    postUrn: string,
+    accessToken: string,
+  ): Promise<{ verified: boolean; permalink?: string }> {
+    try {
+      const encodedUrn = encodeURIComponent(postUrn);
+      await axios.get(`${API_BASE}/posts/${encodedUrn}`, {
+        headers: buildHeaders(accessToken),
+      });
+      return {
+        verified: true,
+        permalink: `https://www.linkedin.com/feed/update/${postUrn}/`,
+      };
+    } catch (err) {
+      console.error('LinkedIn Verify Fehler:', err);
+      return { verified: false };
+    }
+  }
 }

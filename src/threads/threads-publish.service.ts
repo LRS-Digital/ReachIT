@@ -87,4 +87,24 @@ export class ThreadsPublishService {
     );
     return response.data.id;
   }
+
+  /**
+   * Fragt nach dem Veröffentlichen aktiv zurück, ob der Post wirklich
+   * existiert (echte Bestätigung statt nur der ersten API-Antwort zu
+   * vertrauen). Gibt den permalink zurück, falls erfolgreich.
+   */
+  async verifyPost(
+    postId: string,
+    accessToken: string,
+  ): Promise<{ verified: boolean; permalink?: string }> {
+    try {
+      const response = await axios.get(`${GRAPH_BASE}/${postId}`, {
+        params: { fields: 'id,permalink', access_token: accessToken },
+      });
+      return { verified: true, permalink: response.data.permalink };
+    } catch (err) {
+      console.error('Threads Verify Fehler:', err);
+      return { verified: false };
+    }
+  }
 }
