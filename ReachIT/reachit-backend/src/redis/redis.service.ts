@@ -18,6 +18,23 @@ export class RedisService implements OnModuleDestroy {
     await this.client.set(key, value, 'EX', ttlSeconds);
   }
 
+  /**
+   * Setzt den Schlüssel nur, wenn er noch nicht existiert - für Sperren.
+   * Gibt true zurück, wenn die Sperre erworben wurde.
+   */
+  async setIfAbsent(
+    key: string,
+    value: string,
+    ttlSeconds: number,
+  ): Promise<boolean> {
+    const result = await this.client.set(key, value, 'EX', ttlSeconds, 'NX');
+    return result === 'OK';
+  }
+
+  async exists(key: string): Promise<boolean> {
+    return (await this.client.exists(key)) === 1;
+  }
+
   async get(key: string): Promise<string | null> {
     return this.client.get(key);
   }

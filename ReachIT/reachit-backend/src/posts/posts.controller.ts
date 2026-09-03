@@ -16,7 +16,7 @@ import { TiktokPublishService } from '../tiktok/tiktok-publish.service.js';
 import { ThreadsPublishService } from '../threads/threads-publish.service.js';
 import { LinkedinPublishService } from '../linkedin/linkedin-publish.service.js';
 import { SupabaseService } from '../supabase/supabase.service.js';
-import { EncryptionService } from '../crypto/encryption.service.js';
+import { TokenRefreshService } from '../tokens/token-refresh.service.js';
 import { PostLogService } from './post-log.service.js';
 import { describeError } from '../common/describe-error.js';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard.js';
@@ -32,7 +32,7 @@ export class PostsController {
     private readonly threads: ThreadsPublishService,
     private readonly linkedin: LinkedinPublishService,
     private readonly supabase: SupabaseService,
-    private readonly encryption: EncryptionService,
+    private readonly tokens: TokenRefreshService,
     private readonly postLog: PostLogService,
   ) {}
 
@@ -58,7 +58,7 @@ export class PostsController {
 
       connectedAccountId = account.id;
 
-      const accessToken = this.encryption.decrypt(account.access_token);
+      const accessToken = await this.tokens.ensureFresh(account);
       const imageUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
 
       const containerId = await this.instagram.createImageContainer(
@@ -144,7 +144,7 @@ export class PostsController {
 
       connectedAccountId = account.id;
 
-      const accessToken = this.encryption.decrypt(account.access_token);
+      const accessToken = await this.tokens.ensureFresh(account);
       const videoUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
 
       const shouldShareToFeed = shareToFeed !== 'false';
@@ -231,7 +231,7 @@ export class PostsController {
 
       connectedAccountId = account.id;
 
-      const accessToken = this.encryption.decrypt(account.access_token);
+      const accessToken = await this.tokens.ensureFresh(account);
 
       const { publishId, uploadUrl } = await this.tiktok.initVideoUpload(
         accessToken,
@@ -309,7 +309,7 @@ export class PostsController {
 
       connectedAccountId = account.id;
 
-      const accessToken = this.encryption.decrypt(account.access_token);
+      const accessToken = await this.tokens.ensureFresh(account);
 
       let imageUrl: string | undefined;
       let videoUrl: string | undefined;
@@ -410,7 +410,7 @@ export class PostsController {
 
       connectedAccountId = account.id;
 
-      const accessToken = this.encryption.decrypt(account.access_token);
+      const accessToken = await this.tokens.ensureFresh(account);
       const personUrn = `urn:li:person:${account.platform_user_id}`;
 
       let imageUrn: string | undefined;
