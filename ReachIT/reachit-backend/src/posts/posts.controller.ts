@@ -3,6 +3,7 @@ import {
   Post,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
   Body,
   Res,
 } from '@nestjs/common';
@@ -18,8 +19,11 @@ import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
 import { PostLogService } from './post-log.service.js';
 import { describeError } from '../common/describe-error.js';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard.js';
+import { CurrentUser } from '../auth/current-user.decorator.js';
 
 @Controller('posts')
+@UseGuards(SupabaseAuthGuard)
 export class PostsController {
   constructor(
     private readonly r2: R2Service,
@@ -37,15 +41,12 @@ export class PostsController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async postToInstagram(
     @UploadedFile() file: Express.Multer.File,
-    @Body('userId') userId: string,
+    @CurrentUser() userId: string,
     @Body('caption') caption: string,
     @Res() res: Response,
   ) {
     if (!file) {
       return res.status(400).json({ error: 'Keine Datei hochgeladen.' });
-    }
-    if (!userId) {
-      return res.status(400).json({ error: 'Keine userId angegeben.' });
     }
 
     let connectedAccountId: string | undefined;
@@ -125,16 +126,13 @@ export class PostsController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async postInstagramReel(
     @UploadedFile() file: Express.Multer.File,
-    @Body('userId') userId: string,
+    @CurrentUser() userId: string,
     @Body('caption') caption: string,
     @Body('shareToFeed') shareToFeed: string,
     @Res() res: Response,
   ) {
     if (!file) {
       return res.status(400).json({ error: 'Keine Datei hochgeladen.' });
-    }
-    if (!userId) {
-      return res.status(400).json({ error: 'Keine userId angegeben.' });
     }
 
     let connectedAccountId: string | undefined;
@@ -216,15 +214,12 @@ export class PostsController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async postToTiktok(
     @UploadedFile() file: Express.Multer.File,
-    @Body('userId') userId: string,
+    @CurrentUser() userId: string,
     @Body('caption') caption: string,
     @Res() res: Response,
   ) {
     if (!file) {
       return res.status(400).json({ error: 'Keine Datei hochgeladen.' });
-    }
-    if (!userId) {
-      return res.status(400).json({ error: 'Keine userId angegeben.' });
     }
 
     let connectedAccountId: string | undefined;
@@ -287,13 +282,10 @@ export class PostsController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async postToThreads(
     @UploadedFile() file: Express.Multer.File | undefined,
-    @Body('userId') userId: string,
+    @CurrentUser() userId: string,
     @Body('text') text: string,
     @Res() res: Response,
   ) {
-    if (!userId) {
-      return res.status(400).json({ error: 'Keine userId angegeben.' });
-    }
     if (!text && !file) {
       return res
         .status(400)
@@ -399,13 +391,10 @@ export class PostsController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async postToLinkedin(
     @UploadedFile() file: Express.Multer.File | undefined,
-    @Body('userId') userId: string,
+    @CurrentUser() userId: string,
     @Body('text') text: string,
     @Res() res: Response,
   ) {
-    if (!userId) {
-      return res.status(400).json({ error: 'Keine userId angegeben.' });
-    }
     if (!text) {
       return res.status(400).json({ error: 'Text wird benötigt.' });
     }

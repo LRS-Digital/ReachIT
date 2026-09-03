@@ -4,11 +4,7 @@ import { SupabaseService } from '../supabase/supabase.service.js';
 export type PostStatus = 'success' | 'failed';
 export type MediaType = 'text' | 'image' | 'video';
 export type Platform =
-  | 'instagram'
-  | 'tiktok'
-  | 'threads'
-  | 'linkedin'
-  | 'pinterest';
+  'instagram' | 'tiktok' | 'threads' | 'linkedin' | 'pinterest';
 
 interface LogAttemptParams {
   userId: string;

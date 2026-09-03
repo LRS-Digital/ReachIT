@@ -1,9 +1,12 @@
-import { Controller, Get, Query, Res, Req } from '@nestjs/common';
-import type { Response, Request } from 'express';
+import { Controller, Get, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import axios from 'axios';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
 import { describeError } from '../common/describe-error.js';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard.js';
+import { CurrentUser } from '../auth/current-user.decorator.js';
+import { OAuthStateService } from '../auth/oauth-state.service.js';
 
 const INSTAGRAM_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/instagram/callback';
@@ -15,34 +18,47 @@ export class ConnectController {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly encryption: EncryptionService,
+    private readonly oauthState: OAuthStateService,
   ) {}
 
-  // Schritt 1: Nutzer klickt "Instagram verbinden" -> Redirect zu Instagram
-  @Get('instagram')
-  connectInstagram(@Query('userId') userId: string, @Res() res: Response) {
+  // Schritt 1: Die App holt sich die Autorisierungs-URL. Das geht nur mit
+  // gueltigem Supabase-Token, denn hier wird festgelegt, welchem ReachIT-Nutzer
+  // das Instagram-Konto spaeter zugeordnet wird.
+  @Post('instagram/start')
+  @UseGuards(SupabaseAuthGuard)
+  async startInstagram(@CurrentUser() userId: string) {
+    const state = await this.oauthState.create('instagram', userId);
+
     const params = new URLSearchParams({
       client_id: process.env.INSTAGRAM_CLIENT_ID!,
       redirect_uri: INSTAGRAM_REDIRECT_URI,
       response_type: 'code',
       scope: INSTAGRAM_SCOPES,
-      state: userId, // so wissen wir im Callback, welcher ReachIT-Nutzer das war
+      state,
     });
 
-    return res.redirect(
-      `https://api.instagram.com/oauth/authorize?${params.toString()}`,
-    );
+    return {
+      url: `https://api.instagram.com/oauth/authorize?${params.toString()}`,
+    };
   }
 
   // Schritt 2: Instagram leitet mit einem "code" hierher zurück
   @Get('instagram/callback')
   async instagramCallback(
     @Query('code') code: string,
-    @Query('state') userId: string,
+    @Query('state') state: string,
     @Res() res: Response,
   ) {
-    if (!code) {
-      return res.status(400).send('Kein Autorisierungscode erhalten.');
+    // Der State ist ein Einmal-Token aus Redis, keine rohe Nutzer-ID mehr.
+    const pending = await this.oauthState.consume('instagram', state);
+
+    if (!code || !pending) {
+      return res
+        .status(400)
+        .send('Ungültige oder abgelaufene Anfrage. Bitte erneut versuchen.');
     }
+
+    const userId = pending.userId;
 
     try {
       // Code gegen kurzlebiges Access Token tauschen

@@ -1,17 +1,17 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
-import { RedisService } from '../redis/redis.service.js';
 import { describeError } from '../common/describe-error.js';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard.js';
+import { CurrentUser } from '../auth/current-user.decorator.js';
+import { OAuthStateService } from '../auth/oauth-state.service.js';
 
 const TIKTOK_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/tiktok/callback';
 const TIKTOK_SCOPES = 'user.info.basic,video.publish,video.upload';
-
-const PKCE_TTL_SECONDS = 10 * 60; // 10 Minuten
 
 function generateCodeVerifier(): string {
   return crypto.randomBytes(32).toString('base64url');
@@ -26,22 +26,22 @@ export class TiktokConnectController {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly encryption: EncryptionService,
-    private readonly redis: RedisService,
+    private readonly oauthState: OAuthStateService,
   ) {}
 
-  // Schritt 1: Nutzer klickt "TikTok verbinden" -> Redirect zu TikTok
-  @Get('tiktok')
-  async connectTiktok(@Query('userId') userId: string, @Res() res: Response) {
+  // Schritt 1: Die App holt sich die Autorisierungs-URL. Das geht nur mit
+  // gültigem Supabase-Token, denn hier wird festgelegt, welchem ReachIT-Nutzer
+  // das TikTok-Konto später zugeordnet wird.
+  @Post('tiktok/start')
+  @UseGuards(SupabaseAuthGuard)
+  async startTiktok(@CurrentUser() userId: string) {
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
-    const state = crypto.randomBytes(16).toString('hex');
 
-    // Verifier + userId in Redis zwischenspeichern (10 Minuten gültig)
-    await this.redis.set(
-      `tiktok:pkce:${state}`,
-      JSON.stringify({ userId, codeVerifier }),
-      PKCE_TTL_SECONDS,
-    );
+    // Der PKCE-Verifier reist zusammen mit der Nutzer-ID im State-Eintrag.
+    const state = await this.oauthState.create('tiktok', userId, {
+      codeVerifier,
+    });
 
     const params = new URLSearchParams({
       client_key: process.env.TIKTOK_CLIENT_KEY!,
@@ -53,9 +53,9 @@ export class TiktokConnectController {
       code_challenge_method: 'S256',
     });
 
-    return res.redirect(
-      `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`,
-    );
+    return {
+      url: `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`,
+    };
   }
 
   // Schritt 2: TikTok leitet mit "code" und "state" hierher zurück
@@ -65,19 +65,16 @@ export class TiktokConnectController {
     @Query('state') state: string,
     @Res() res: Response,
   ) {
-    const pendingRaw = await this.redis.get(`tiktok:pkce:${state}`);
+    // Der State ist ein Einmal-Token aus Redis und trägt den PKCE-Verifier.
+    const pending = await this.oauthState.consume('tiktok', state);
 
-    if (!code || !pendingRaw) {
+    if (!code || !pending) {
       return res
         .status(400)
         .send('Ungültige oder abgelaufene Anfrage. Bitte erneut versuchen.');
     }
 
-    await this.redis.delete(`tiktok:pkce:${state}`);
-    const { userId, codeVerifier } = JSON.parse(pendingRaw) as {
-      userId: string;
-      codeVerifier: string;
-    };
+    const { userId, codeVerifier } = pending;
 
     try {
       const tokenResponse = await axios.post(

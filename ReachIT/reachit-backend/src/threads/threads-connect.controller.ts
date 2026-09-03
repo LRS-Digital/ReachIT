@@ -1,10 +1,22 @@
-import { Controller, Get, Post, Query, Body, Param, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Body,
+  Param,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
 import { describeError } from '../common/describe-error.js';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard.js';
+import { CurrentUser } from '../auth/current-user.decorator.js';
+import { OAuthStateService } from '../auth/oauth-state.service.js';
 
 const THREADS_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/threads/callback';
@@ -45,34 +57,47 @@ export class ThreadsConnectController {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly encryption: EncryptionService,
+    private readonly oauthState: OAuthStateService,
   ) {}
 
-  // Schritt 1: Nutzer klickt "Threads verbinden" -> Redirect zu Threads
-  @Get('threads')
-  connectThreads(@Query('userId') userId: string, @Res() res: Response) {
+  // Schritt 1: Die App holt sich die Autorisierungs-URL. Das geht nur mit
+  // gültigem Supabase-Token, denn hier wird festgelegt, welchem ReachIT-Nutzer
+  // das Threads-Konto später zugeordnet wird.
+  @Post('threads/start')
+  @UseGuards(SupabaseAuthGuard)
+  async startThreads(@CurrentUser() userId: string) {
+    const state = await this.oauthState.create('threads', userId);
+
     const params = new URLSearchParams({
       client_id: process.env.THREADS_CLIENT_ID!,
       redirect_uri: THREADS_REDIRECT_URI,
       scope: THREADS_SCOPES,
       response_type: 'code',
-      state: userId,
+      state,
     });
 
-    return res.redirect(
-      `https://www.threads.com/oauth/authorize?${params.toString()}`,
-    );
+    return {
+      url: `https://www.threads.com/oauth/authorize?${params.toString()}`,
+    };
   }
 
   // Schritt 2: Threads leitet mit "code" hierher zurück
   @Get('threads/callback')
   async threadsCallback(
     @Query('code') code: string,
-    @Query('state') userId: string,
+    @Query('state') state: string,
     @Res() res: Response,
   ) {
-    if (!code) {
-      return res.status(400).send('Kein Autorisierungscode erhalten.');
+    // Der State ist ein Einmal-Token aus Redis, keine rohe Nutzer-ID mehr.
+    const pending = await this.oauthState.consume('threads', state);
+
+    if (!code || !pending) {
+      return res
+        .status(400)
+        .send('Ungültige oder abgelaufene Anfrage. Bitte erneut versuchen.');
     }
+
+    const userId = pending.userId;
 
     try {
       const tokenResponse = await axios.post(

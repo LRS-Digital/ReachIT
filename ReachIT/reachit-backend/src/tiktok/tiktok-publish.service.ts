@@ -72,14 +72,18 @@ export class TiktokPublishService {
   /**
    * Schritt 2: Video-Bytes in Chunks an die Upload-URL senden.
    */
-  async uploadVideoChunks(uploadUrl: string, videoBuffer: Buffer): Promise<void> {
+  async uploadVideoChunks(
+    uploadUrl: string,
+    videoBuffer: Buffer,
+  ): Promise<void> {
     const totalSize = videoBuffer.length;
     const { chunkSize, totalChunkCount } = planChunks(totalSize);
 
     for (let i = 0; i < totalChunkCount; i++) {
       const start = i * chunkSize;
       // Letzter Chunk bekommt den kompletten Rest (auch wenn > chunkSize)
-      const end = i === totalChunkCount - 1 ? totalSize - 1 : start + chunkSize - 1;
+      const end =
+        i === totalChunkCount - 1 ? totalSize - 1 : start + chunkSize - 1;
       const chunk = videoBuffer.subarray(start, end + 1);
 
       await axios.put(uploadUrl, chunk, {
@@ -97,7 +101,10 @@ export class TiktokPublishService {
   /**
    * Schritt 3: Status abfragen, bis die Verarbeitung abgeschlossen ist.
    */
-  async waitUntilPublished(publishId: string, accessToken: string): Promise<void> {
+  async waitUntilPublished(
+    publishId: string,
+    accessToken: string,
+  ): Promise<void> {
     const maxAttempts = 20;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -124,6 +131,8 @@ export class TiktokPublishService {
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
 
-    throw new Error('Timeout: TikTok hat das Video nicht rechtzeitig verarbeitet.');
+    throw new Error(
+      'Timeout: TikTok hat das Video nicht rechtzeitig verarbeitet.',
+    );
   }
 }
