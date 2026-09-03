@@ -247,8 +247,14 @@ export class PostsController {
         accessToken,
       );
 
-      // TikToks Status-Polling bis PUBLISH_COMPLETE IST bereits die
-      // echte Bestätigung - kein zusätzlicher Call nötig
+      // PUBLISH_COMPLETE ist nur TikToks Zusage, die Verarbeitung abgeschlossen
+      // zu haben. Erst die Videoliste des Kontos beweist, dass das Video
+      // wirklich dort liegt - und liefert nebenbei die echte Post-ID.
+      const verifyResult = await this.tiktok.verifyPost(
+        accessToken,
+        caption ?? '',
+      );
+
       await this.postLog.logAttempt({
         userId,
         connectedAccountId,
@@ -256,14 +262,20 @@ export class PostsController {
         mediaType: 'video',
         platform: 'tiktok',
         status: 'success',
-        externalId: postId ?? publishId,
+        externalId: verifyResult.externalId ?? postId ?? publishId,
         fileSizeBytes: file.size,
         mimeType: file.mimetype,
         durationMs: Date.now() - startTime,
-        verified: true,
+        verified: verifyResult.verified,
+        postUrl: verifyResult.permalink,
       });
 
-      return res.json({ success: true, publishId, postId, verified: true });
+      return res.json({
+        success: true,
+        publishId,
+        verified: verifyResult.verified,
+        postUrl: verifyResult.permalink,
+      });
     } catch (err) {
       console.error('TikTok Post Fehler:', describeError(err));
       await this.postLog.logAttempt({

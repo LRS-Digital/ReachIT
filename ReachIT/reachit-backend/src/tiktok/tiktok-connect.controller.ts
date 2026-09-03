@@ -11,7 +11,7 @@ import { OAuthStateService } from '../auth/oauth-state.service.js';
 
 const TIKTOK_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/tiktok/callback';
-const TIKTOK_SCOPES = 'user.info.basic,video.publish,video.upload';
+const TIKTOK_SCOPES = 'user.info.basic,video.publish,video.upload,video.list';
 
 function generateCodeVerifier(): string {
   return crypto.randomBytes(32).toString('base64url');

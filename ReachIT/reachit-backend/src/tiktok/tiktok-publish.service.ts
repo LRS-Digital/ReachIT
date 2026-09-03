@@ -1,7 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
+import { describeError } from '../common/describe-error.js';
 
 const API_BASE = 'https://open.tiktokapis.com/v2/post/publish';
+const VIDEO_LIST_URL = 'https://open.tiktokapis.com/v2/video/list/';
+
+// Zeitfenster, in dem ein Video als "gerade eben veroeffentlicht" gilt
+const VERIFY_FENSTER_SEKUNDEN = 15 * 60;
+
+interface TiktokVideo {
+  id: string;
+  title?: string;
+  create_time: number;
+  share_url?: string;
+}
 
 // TikTok verlangt Chunks >= 5MB, außer die Gesamtdatei ist kleiner
 const MIN_CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
@@ -150,5 +162,64 @@ export class TiktokPublishService {
     throw new Error(
       'Timeout: TikTok hat das Video nicht rechtzeitig verarbeitet.',
     );
+  }
+
+  /**
+   * Fragt nach dem Veröffentlichen bei TikTok zurück, ob das Video wirklich
+   * auf dem Konto liegt.
+   *
+   * PUBLISH_COMPLETE aus dem Status-Polling ist nur TikToks Zusage, die
+   * Verarbeitung abgeschlossen zu haben. Eine Post-ID liefert die Antwort
+   * nicht: Das Feld heißt `publicaly_available_post_id`, und bei privaten
+   * Posts (privacy_level SELF_ONLY) gibt es keine öffentlich verfügbare ID.
+   * Gemessen an der Datenlage bleibt nur der Umweg über die Videoliste des
+   * Kontos - passt der Titel und ist das Video gerade eben entstanden, ist es
+   * dasselbe.
+   *
+   * Braucht den Scope `video.list`. Konten, die vorher verbunden wurden,
+   * müssen einmal neu verbinden, sonst antwortet TikTok mit einem Scope-Fehler
+   * und die Verifizierung meldet verified: false.
+   */
+  async verifyPost(
+    accessToken: string,
+    caption: string,
+  ): Promise<{ verified: boolean; externalId?: string; permalink?: string }> {
+    try {
+      const response = await axios.post(
+        `${VIDEO_LIST_URL}?fields=id,title,create_time,share_url`,
+        { max_count: 10 },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      console.log(
+        'TikTok Videoliste:',
+        JSON.stringify(response.data?.data ?? response.data),
+      );
+
+      const videos: TiktokVideo[] = response.data?.data?.videos ?? [];
+      const grenze = Math.floor(Date.now() / 1000) - VERIFY_FENSTER_SEKUNDEN;
+
+      const treffer = videos.find(
+        (video) =>
+          video.create_time >= grenze &&
+          (caption === '' || video.title === caption),
+      );
+
+      if (!treffer) return { verified: false };
+
+      return {
+        verified: true,
+        externalId: String(treffer.id),
+        permalink: treffer.share_url,
+      };
+    } catch (err) {
+      console.error('TikTok Verify Fehler:', describeError(err));
+      return { verified: false };
+    }
   }
 }
