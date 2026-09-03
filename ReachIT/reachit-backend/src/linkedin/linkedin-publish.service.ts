@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
+import { describeError } from '../common/describe-error.js';
 
 const API_BASE = 'https://api.linkedin.com/rest';
 // LinkedIn verlangt einen Versions-Header im Format YYYYMM
@@ -97,7 +98,7 @@ export class LinkedinPublishService {
         permalink: `https://www.linkedin.com/feed/update/${postUrn}/`,
       };
     } catch (err) {
-      console.error('LinkedIn Verify Fehler:', err);
+      console.error('LinkedIn Verify Fehler:', describeError(err));
       return { verified: false };
     }
   }

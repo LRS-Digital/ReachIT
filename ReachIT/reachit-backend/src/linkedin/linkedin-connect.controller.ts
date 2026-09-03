@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import axios from 'axios';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
+import { describeError } from '../common/describe-error.js';
 
 const LINKEDIN_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/linkedin/callback';
@@ -91,7 +92,7 @@ export class LinkedinConnectController {
         'LinkedIn-Konto erfolgreich verbunden! Du kannst dieses Fenster schließen.',
       );
     } catch (err) {
-      console.error('LinkedIn OAuth Fehler:', err);
+      console.error('LinkedIn OAuth Fehler:', describeError(err));
       return res.status(500).send('Verbindung fehlgeschlagen.');
     }
   }

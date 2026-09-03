@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
 import { RedisService } from '../redis/redis.service.js';
+import { describeError } from '../common/describe-error.js';
 
 const TIKTOK_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/tiktok/callback';
@@ -125,7 +126,7 @@ export class TiktokConnectController {
         'TikTok-Konto erfolgreich verbunden! Du kannst dieses Fenster schließen.',
       );
     } catch (err) {
-      console.error('TikTok OAuth Fehler:', err);
+      console.error('TikTok OAuth Fehler:', describeError(err));
       return res.status(500).send('Verbindung fehlgeschlagen.');
     }
   }

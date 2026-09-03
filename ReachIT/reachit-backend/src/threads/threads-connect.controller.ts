@@ -4,6 +4,7 @@ import axios from 'axios';
 import * as crypto from 'crypto';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
+import { describeError } from '../common/describe-error.js';
 
 const THREADS_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/threads/callback';
@@ -139,7 +140,7 @@ export class ThreadsConnectController {
         'Threads-Konto erfolgreich verbunden! Du kannst dieses Fenster schließen.',
       );
     } catch (err) {
-      console.error('Threads OAuth Fehler:', err);
+      console.error('Threads OAuth Fehler:', describeError(err));
       return res.status(500).send('Verbindung fehlgeschlagen.');
     }
   }
@@ -169,7 +170,7 @@ export class ThreadsConnectController {
 
       return res.status(200).send('OK');
     } catch (err) {
-      console.error('Threads Deauthorize Fehler:', err);
+      console.error('Threads Deauthorize Fehler:', describeError(err));
       return res.status(400).send('Ungültige Anfrage.');
     }
   }
@@ -203,7 +204,7 @@ export class ThreadsConnectController {
         confirmation_code: confirmationCode,
       });
     } catch (err) {
-      console.error('Threads Data Deletion Fehler:', err);
+      console.error('Threads Data Deletion Fehler:', describeError(err));
       return res.status(400).send('Ungültige Anfrage.');
     }
   }

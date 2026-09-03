@@ -3,6 +3,7 @@ import type { Response, Request } from 'express';
 import axios from 'axios';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
+import { describeError } from '../common/describe-error.js';
 
 const INSTAGRAM_REDIRECT_URI =
   'https://reachit-backend-production.up.railway.app/connect/instagram/callback';
@@ -116,7 +117,7 @@ export class ConnectController {
         'Instagram-Konto erfolgreich verbunden! Du kannst dieses Fenster schließen.',
       );
     } catch (err) {
-      console.error('Instagram OAuth Fehler:', err);
+      console.error('Instagram OAuth Fehler:', describeError(err));
       return res.status(500).send('Verbindung fehlgeschlagen.');
     }
   }

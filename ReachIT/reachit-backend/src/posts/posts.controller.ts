@@ -17,6 +17,7 @@ import { LinkedinPublishService } from '../linkedin/linkedin-publish.service.js'
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { EncryptionService } from '../crypto/encryption.service.js';
 import { PostLogService } from './post-log.service.js';
+import { describeError } from '../common/describe-error.js';
 
 @Controller('posts')
 export class PostsController {
@@ -75,7 +76,10 @@ export class PostsController {
       );
 
       // Echte Bestätigung: nachfragen, ob der Post wirklich existiert
-      const verifyResult = await this.instagram.verifyPost(mediaId, accessToken);
+      const verifyResult = await this.instagram.verifyPost(
+        mediaId,
+        accessToken,
+      );
 
       await this.postLog.logAttempt({
         userId,
@@ -99,7 +103,7 @@ export class PostsController {
         postUrl: verifyResult.permalink,
       });
     } catch (err) {
-      console.error('Instagram Post Fehler:', err);
+      console.error('Instagram Post Fehler:', describeError(err));
       await this.postLog.logAttempt({
         userId,
         connectedAccountId,
@@ -163,7 +167,10 @@ export class PostsController {
         containerId,
       );
 
-      const verifyResult = await this.instagram.verifyPost(mediaId, accessToken);
+      const verifyResult = await this.instagram.verifyPost(
+        mediaId,
+        accessToken,
+      );
 
       await this.postLog.logAttempt({
         userId,
@@ -187,7 +194,7 @@ export class PostsController {
         postUrl: verifyResult.permalink,
       });
     } catch (err) {
-      console.error('Instagram Reel Fehler:', err);
+      console.error('Instagram Reel Fehler:', describeError(err));
       await this.postLog.logAttempt({
         userId,
         connectedAccountId,
@@ -258,7 +265,7 @@ export class PostsController {
 
       return res.json({ success: true, publishId, verified: true });
     } catch (err) {
-      console.error('TikTok Post Fehler:', err);
+      console.error('TikTok Post Fehler:', describeError(err));
       await this.postLog.logAttempt({
         userId,
         connectedAccountId,
@@ -316,7 +323,10 @@ export class PostsController {
       let videoUrl: string | undefined;
 
       if (file) {
-        const uploadedUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
+        const uploadedUrl = await this.r2.uploadFile(
+          file.buffer,
+          file.mimetype,
+        );
         if (mediaType === 'video') {
           videoUrl = uploadedUrl;
         } else {
@@ -367,7 +377,7 @@ export class PostsController {
         postUrl: verifyResult.permalink,
       });
     } catch (err) {
-      console.error('Threads Post Fehler:', err);
+      console.error('Threads Post Fehler:', describeError(err));
       await this.postLog.logAttempt({
         userId,
         connectedAccountId,
@@ -454,7 +464,7 @@ export class PostsController {
         postUrl: verifyResult.permalink,
       });
     } catch (err) {
-      console.error('LinkedIn Post Fehler:', err);
+      console.error('LinkedIn Post Fehler:', describeError(err));
       await this.postLog.logAttempt({
         userId,
         connectedAccountId,

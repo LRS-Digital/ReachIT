@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
+import { describeError } from '../common/describe-error.js';
 
 const GRAPH_BASE = 'https://graph.threads.net';
 
@@ -44,7 +45,10 @@ export class ThreadsPublishService {
    * Instagram). Meta empfiehlt ca. einmal pro Minute für max. 5 Minuten
    * abzufragen.
    */
-  async waitUntilReady(containerId: string, accessToken: string): Promise<void> {
+  async waitUntilReady(
+    containerId: string,
+    accessToken: string,
+  ): Promise<void> {
     const maxAttempts = 5;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -64,7 +68,9 @@ export class ThreadsPublishService {
       await new Promise((resolve) => setTimeout(resolve, 60000));
     }
 
-    throw new Error('Timeout: Threads hat das Video nicht rechtzeitig verarbeitet.');
+    throw new Error(
+      'Timeout: Threads hat das Video nicht rechtzeitig verarbeitet.',
+    );
   }
 
   /**
@@ -103,7 +109,7 @@ export class ThreadsPublishService {
       });
       return { verified: true, permalink: response.data.permalink };
     } catch (err) {
-      console.error('Threads Verify Fehler:', err);
+      console.error('Threads Verify Fehler:', describeError(err));
       return { verified: false };
     }
   }
