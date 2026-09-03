@@ -17,6 +17,9 @@ import { ThreadsPublishService } from '../threads/threads-publish.service.js';
 import { LinkedinPublishService } from '../linkedin/linkedin-publish.service.js';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { TokenRefreshService } from '../tokens/token-refresh.service.js';
+import type { MediaType, Platform } from './post-log.service.js';
+import { MultiPostService } from './multi-post.service.js';
+import type { ConnectedAccount } from '../tokens/token-refresh.service.js';
 import { PostLogService } from './post-log.service.js';
 import { describeError } from '../common/describe-error.js';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard.js';
@@ -34,6 +37,7 @@ export class PostsController {
     private readonly supabase: SupabaseService,
     private readonly tokens: TokenRefreshService,
     private readonly postLog: PostLogService,
+    private readonly multiPost: MultiPostService,
   ) {}
 
   // Instagram Feed-Post (Bild)
@@ -485,6 +489,217 @@ export class PostsController {
       });
       return res.status(500).json({ error: 'Posten fehlgeschlagen.' });
     }
+  }
+
+  /**
+   * Zentraler Endpunkt: ein Aufruf, mehrere Plattformen.
+   *
+   * Erzeugt genau einen posts-Eintrag mit einem post_targets-Eintrag je Ziel.
+   * Die Ziele laufen parallel, und ein Fehlschlag auf einer Plattform lässt
+   * die anderen unberührt - die Antwort nennt jede Plattform einzeln.
+   *
+   * Bewusst synchron statt über eine Warteschlange: Der Aufrufer bekommt das
+   * Ergebnis pro Plattform sofort. BullMQ wird interessant, sobald geplante
+   * Posts oder Wiederholversuche dazukommen - dann ändert sich aber auch der
+   * Vertrag, weil der Endpunkt nur noch eine Auftragsnummer zurückgeben kann.
+   */
+  @Post()
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async postToAll(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() userId: string,
+    @Body('platforms') platforms: string,
+    @Body('text') text: string,
+    @Body('shareToFeed') shareToFeed: string,
+    @Res() res: Response,
+  ) {
+    const ziele = (platforms ?? '')
+      .split(',')
+      .map((eintrag) => eintrag.trim().toLowerCase())
+      .filter(Boolean) as Platform[];
+
+    if (ziele.length === 0) {
+      return res.status(400).json({
+        error: 'Keine Plattformen angegeben (Feld "platforms", kommagetrennt).',
+      });
+    }
+
+    if (!text && !file) {
+      return res
+        .status(400)
+        .json({ error: 'Entweder Text oder eine Datei wird benötigt.' });
+    }
+
+    const mediaType: MediaType = file
+      ? file.mimetype.startsWith('video/')
+        ? 'video'
+        : 'image'
+      : 'text';
+
+    // Ein Eintrag für den gesamten Post, die Ziele hängen darunter
+    const postId = await this.postLog.legePostAn({
+      userId,
+      caption: text ?? '',
+      mediaType,
+      fileSizeBytes: file?.size,
+      mimeType: file?.mimetype,
+    });
+
+    const konten = await this.ladeVerbundeneKonten(userId, ziele);
+
+    // Nur einmal nach R2 hochladen, auch wenn Instagram und Threads beide eine
+    // URL brauchen - der Upload ist der teuerste Teil des Vorgangs.
+    let mediaUrl: string | undefined;
+
+    if (file && ziele.some((ziel) => this.multiPost.brauchtMedienUrl(ziel))) {
+      mediaUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
+    }
+
+    const ergebnisse = await Promise.all(
+      ziele.map((ziel) =>
+        this.veroeffentlicheZiel({
+          ziel,
+          konten,
+          postId,
+          text: text ?? '',
+          file,
+          mediaType,
+          mediaUrl,
+          shareToFeed: shareToFeed !== 'false',
+        }),
+      ),
+    );
+
+    const erfolge = ergebnisse.filter((ergebnis) => ergebnis.success);
+    await this.postLog.setzePostStatus(postId, erfolge.length > 0);
+
+    // 502, wenn keine einzige Plattform erreicht wurde - ein Teilerfolg gilt
+    // als Erfolg, das Detail steht in results.
+    return res.status(erfolge.length > 0 ? 200 : 502).json({
+      success: erfolge.length > 0,
+      postId,
+      erfolgreich: erfolge.length,
+      gesamt: ziele.length,
+      results: ergebnisse,
+    });
+  }
+
+  /**
+   * Veröffentlicht auf genau einer Plattform und protokolliert das Ergebnis.
+   * Wirft nie - ein Fehler wird zum Fehlschlag dieses einen Ziels, damit die
+   * übrigen Plattformen davon unberührt bleiben.
+   */
+  private async veroeffentlicheZiel(kontext: {
+    ziel: Platform;
+    konten: Map<string, ConnectedAccount>;
+    postId: string | null;
+    text: string;
+    file?: Express.Multer.File;
+    mediaType: MediaType;
+    mediaUrl?: string;
+    shareToFeed: boolean;
+  }): Promise<{
+    platform: Platform;
+    success: boolean;
+    verified?: boolean;
+    externalId?: string;
+    postUrl?: string;
+    error?: string;
+  }> {
+    const { ziel, konten, postId, text, file, mediaType, mediaUrl } = kontext;
+    const startZeit = Date.now();
+
+    const alsFehlschlag = async (
+      nachricht: string,
+      connectedAccountId?: string,
+    ) => {
+      await this.postLog.protokolliereZiel(postId, {
+        platform: ziel,
+        status: 'failed',
+        connectedAccountId,
+        errorMessage: nachricht,
+        durationMs: Date.now() - startZeit,
+      });
+
+      return { platform: ziel, success: false, error: nachricht };
+    };
+
+    const konto = konten.get(ziel);
+
+    if (!konto) {
+      return alsFehlschlag(`Kein ${ziel}-Konto für diesen Nutzer verbunden.`);
+    }
+
+    // Untaugliche Kombinationen vorab abfangen, statt erst bei der
+    // Plattform-API aufzuschlagen - etwa ein Textpost an TikTok.
+    const medienFehler = this.multiPost.pruefeMedienart(ziel, mediaType);
+
+    if (medienFehler) {
+      return alsFehlschlag(medienFehler, konto.id);
+    }
+
+    try {
+      const accessToken = await this.tokens.ensureFresh(konto);
+
+      const ergebnis = await this.multiPost.veroeffentliche({
+        platform: ziel,
+        platformUserId: konto.platform_user_id,
+        accessToken,
+        text,
+        mediaType,
+        fileBuffer: file?.buffer,
+        mediaUrl,
+        shareToFeed: kontext.shareToFeed,
+      });
+
+      await this.postLog.protokolliereZiel(postId, {
+        platform: ziel,
+        status: 'success',
+        connectedAccountId: konto.id,
+        externalId: ergebnis.externalId,
+        durationMs: Date.now() - startZeit,
+        verified: ergebnis.verified,
+        postUrl: ergebnis.postUrl,
+      });
+
+      return {
+        platform: ziel,
+        success: true,
+        verified: ergebnis.verified,
+        externalId: ergebnis.externalId,
+        postUrl: ergebnis.postUrl,
+      };
+    } catch (err) {
+      console.error(`Multi-Post Fehler (${ziel}):`, describeError(err));
+
+      return alsFehlschlag(
+        err instanceof Error ? err.message : String(err),
+        konto.id,
+      );
+    }
+  }
+
+  private async ladeVerbundeneKonten(
+    userId: string,
+    platforms: Platform[],
+  ): Promise<Map<string, ConnectedAccount>> {
+    const { data, error } = await this.supabase.client
+      .from('connected_accounts')
+      .select('*')
+      .eq('user_id', userId)
+      .in('platform', platforms);
+
+    if (error) {
+      console.error('Konten laden fehlgeschlagen:', error);
+    }
+
+    const konten = new Map<string, ConnectedAccount>();
+
+    for (const konto of (data ?? []) as ConnectedAccount[]) {
+      konten.set(konto.platform, konto);
+    }
+
+    return konten;
   }
 
   private async getConnectedAccount(

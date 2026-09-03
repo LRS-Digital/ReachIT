@@ -9,6 +9,7 @@ import { ThreadsPublishService } from '../threads/threads-publish.service.js';
 import { LinkedinPublishService } from '../linkedin/linkedin-publish.service.js';
 import { SupabaseService } from '../supabase/supabase.service.js';
 import { PostLogService } from './post-log.service.js';
+import { MultiPostService } from './multi-post.service.js';
 
 @Module({
   imports: [AuthModule, TokensModule],
@@ -21,6 +22,7 @@ import { PostLogService } from './post-log.service.js';
     LinkedinPublishService,
     SupabaseService,
     PostLogService,
+    MultiPostService,
   ],
 })
 export class PostsModule {}
