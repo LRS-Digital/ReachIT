@@ -440,7 +440,7 @@ export class PostsController {
         imageUrn,
       );
 
-      const verifyResult = await this.linkedin.verifyPost(postUrn, accessToken);
+      const verifyResult = this.linkedin.verifyPost(postUrn);
 
       await this.postLog.logAttempt({
         userId,

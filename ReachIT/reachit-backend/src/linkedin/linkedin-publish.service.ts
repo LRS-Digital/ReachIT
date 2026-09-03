@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
-import { describeError } from '../common/describe-error.js';
 
 const API_BASE = 'https://api.linkedin.com/rest';
 // LinkedIn verlangt einen Versions-Header im Format YYYYMM
@@ -79,27 +78,28 @@ export class LinkedinPublishService {
   }
 
   /**
-   * Fragt nach dem Veröffentlichen aktiv zurück, ob der Post wirklich
-   * existiert (echte Bestätigung statt nur der ersten API-Antwort zu
-   * vertrauen). Der Permalink lässt sich bei LinkedIn direkt aus der
-   * URN konstruieren, sobald die GET-Anfrage erfolgreich ist.
+   * Anders als Instagram und Threads lässt LinkedIn keine Rückfrage nach dem
+   * Veröffentlichen zu: GET /rest/posts/{urn} gehört zur Partner-API und
+   * antwortet mit 403 ACCESS_DENIED (partnerApiPostsExternal.GET), solange die
+   * App keinen Partnerstatus hat. Der Scope w_member_social erlaubt
+   * ausschließlich Schreiben, nicht Lesen.
+   *
+   * Die Bestätigung ist deshalb die Post-URN aus dem Response-Header
+   * x-restli-id - dieselbe Logik wie bei TikTok, wo das Status-Polling bis
+   * PUBLISH_COMPLETE bereits die Bestätigung ist und ein zweiter Call nichts
+   * hinzufügt. Den Permalink baut LinkedIn deterministisch aus der URN.
+   *
+   * Sobald die App Partnerstatus hat, kann hier wieder ein echter Read-Back
+   * ergänzt werden.
    */
-  async verifyPost(
-    postUrn: string,
-    accessToken: string,
-  ): Promise<{ verified: boolean; permalink?: string }> {
-    try {
-      const encodedUrn = encodeURIComponent(postUrn);
-      await axios.get(`${API_BASE}/posts/${encodedUrn}`, {
-        headers: buildHeaders(accessToken),
-      });
-      return {
-        verified: true,
-        permalink: `https://www.linkedin.com/feed/update/${postUrn}/`,
-      };
-    } catch (err) {
-      console.error('LinkedIn Verify Fehler:', describeError(err));
+  verifyPost(postUrn: string): { verified: boolean; permalink?: string } {
+    if (!postUrn) {
       return { verified: false };
     }
+
+    return {
+      verified: true,
+      permalink: `https://www.linkedin.com/feed/update/${postUrn}/`,
+    };
   }
 }
