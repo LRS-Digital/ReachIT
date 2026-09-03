@@ -16,6 +16,7 @@ interface LogAttemptParams {
   mediaType: MediaType;
   platform: Platform;
   status: PostStatus;
+  connectedAccountId?: string;
   externalId?: string;
   errorMessage?: string;
   fileSizeBytes?: number;
@@ -42,6 +43,7 @@ export class PostLogService {
       mediaType,
       platform,
       status,
+      connectedAccountId,
       externalId,
       errorMessage,
       fileSizeBytes,
@@ -57,6 +59,7 @@ export class PostLogService {
         user_id: userId,
         caption,
         media_type: mediaType,
+        status: status === 'success' ? 'done' : 'failed',
         file_size_bytes: fileSizeBytes ?? null,
         mime_type: mimeType ?? null,
       })
@@ -73,6 +76,7 @@ export class PostLogService {
       .from('post_targets')
       .insert({
         post_id: post.id,
+        connected_account_id: connectedAccountId ?? null,
         platform,
         status,
         external_id: externalId ?? null,
@@ -80,6 +84,7 @@ export class PostLogService {
         duration_ms: durationMs ?? null,
         verified: verified ?? false,
         post_url: postUrl ?? null,
+        published_at: status === 'success' ? new Date().toISOString() : null,
       });
 
     if (targetError) {

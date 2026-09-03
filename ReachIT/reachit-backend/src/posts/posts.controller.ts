@@ -47,11 +47,14 @@ export class PostsController {
       return res.status(400).json({ error: 'Keine userId angegeben.' });
     }
 
+    let connectedAccountId: string | undefined;
     const startTime = Date.now();
 
     try {
       const account = await this.getConnectedAccount(userId, 'instagram', res);
       if (!account) return;
+
+      connectedAccountId = account.id;
 
       const accessToken = this.encryption.decrypt(account.access_token);
       const imageUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
@@ -76,6 +79,7 @@ export class PostsController {
 
       await this.postLog.logAttempt({
         userId,
+        connectedAccountId,
         caption: caption ?? '',
         mediaType: 'image',
         platform: 'instagram',
@@ -98,6 +102,7 @@ export class PostsController {
       console.error('Instagram Post Fehler:', err);
       await this.postLog.logAttempt({
         userId,
+        connectedAccountId,
         caption: caption ?? '',
         mediaType: 'image',
         platform: 'instagram',
@@ -128,11 +133,14 @@ export class PostsController {
       return res.status(400).json({ error: 'Keine userId angegeben.' });
     }
 
+    let connectedAccountId: string | undefined;
     const startTime = Date.now();
 
     try {
       const account = await this.getConnectedAccount(userId, 'instagram', res);
       if (!account) return;
+
+      connectedAccountId = account.id;
 
       const accessToken = this.encryption.decrypt(account.access_token);
       const videoUrl = await this.r2.uploadFile(file.buffer, file.mimetype);
@@ -159,6 +167,7 @@ export class PostsController {
 
       await this.postLog.logAttempt({
         userId,
+        connectedAccountId,
         caption: caption ?? '',
         mediaType: 'video',
         platform: 'instagram',
@@ -181,6 +190,7 @@ export class PostsController {
       console.error('Instagram Reel Fehler:', err);
       await this.postLog.logAttempt({
         userId,
+        connectedAccountId,
         caption: caption ?? '',
         mediaType: 'video',
         platform: 'instagram',
@@ -210,11 +220,14 @@ export class PostsController {
       return res.status(400).json({ error: 'Keine userId angegeben.' });
     }
 
+    let connectedAccountId: string | undefined;
     const startTime = Date.now();
 
     try {
       const account = await this.getConnectedAccount(userId, 'tiktok', res);
       if (!account) return;
+
+      connectedAccountId = account.id;
 
       const accessToken = this.encryption.decrypt(account.access_token);
 
@@ -231,6 +244,7 @@ export class PostsController {
       // echte Bestätigung - kein zusätzlicher Call nötig
       await this.postLog.logAttempt({
         userId,
+        connectedAccountId,
         caption: caption ?? '',
         mediaType: 'video',
         platform: 'tiktok',
@@ -247,6 +261,7 @@ export class PostsController {
       console.error('TikTok Post Fehler:', err);
       await this.postLog.logAttempt({
         userId,
+        connectedAccountId,
         caption: caption ?? '',
         mediaType: 'video',
         platform: 'tiktok',
@@ -286,11 +301,14 @@ export class PostsController {
         : 'image'
       : 'text';
 
+    let connectedAccountId: string | undefined;
     const startTime = Date.now();
 
     try {
       const account = await this.getConnectedAccount(userId, 'threads', res);
       if (!account) return;
+
+      connectedAccountId = account.id;
 
       const accessToken = this.encryption.decrypt(account.access_token);
 
@@ -329,6 +347,7 @@ export class PostsController {
 
       await this.postLog.logAttempt({
         userId,
+        connectedAccountId,
         caption: text ?? '',
         mediaType,
         platform: 'threads',
@@ -351,6 +370,7 @@ export class PostsController {
       console.error('Threads Post Fehler:', err);
       await this.postLog.logAttempt({
         userId,
+        connectedAccountId,
         caption: text ?? '',
         mediaType,
         platform: 'threads',
@@ -382,11 +402,14 @@ export class PostsController {
 
     const mediaType: 'text' | 'image' = file ? 'image' : 'text';
 
+    let connectedAccountId: string | undefined;
     const startTime = Date.now();
 
     try {
       const account = await this.getConnectedAccount(userId, 'linkedin', res);
       if (!account) return;
+
+      connectedAccountId = account.id;
 
       const accessToken = this.encryption.decrypt(account.access_token);
       const personUrn = `urn:li:person:${account.platform_user_id}`;
@@ -411,6 +434,7 @@ export class PostsController {
 
       await this.postLog.logAttempt({
         userId,
+        connectedAccountId,
         caption: text,
         mediaType,
         platform: 'linkedin',
@@ -433,6 +457,7 @@ export class PostsController {
       console.error('LinkedIn Post Fehler:', err);
       await this.postLog.logAttempt({
         userId,
+        connectedAccountId,
         caption: text,
         mediaType,
         platform: 'linkedin',
