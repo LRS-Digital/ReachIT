@@ -240,7 +240,12 @@ export class PostsController {
       );
 
       await this.tiktok.uploadVideoChunks(uploadUrl, file.buffer);
-      await this.tiktok.waitUntilPublished(publishId, accessToken);
+      // TikTok liefert die echte Post-ID erst in der Statusantwort. Ohne sie
+      // stuende in external_id nur die publish_id des Upload-Vorgangs.
+      const postId = await this.tiktok.waitUntilPublished(
+        publishId,
+        accessToken,
+      );
 
       // TikToks Status-Polling bis PUBLISH_COMPLETE IST bereits die
       // echte Bestätigung - kein zusätzlicher Call nötig
@@ -251,14 +256,14 @@ export class PostsController {
         mediaType: 'video',
         platform: 'tiktok',
         status: 'success',
-        externalId: publishId,
+        externalId: postId ?? publishId,
         fileSizeBytes: file.size,
         mimeType: file.mimetype,
         durationMs: Date.now() - startTime,
         verified: true,
       });
 
-      return res.json({ success: true, publishId, verified: true });
+      return res.json({ success: true, publishId, postId, verified: true });
     } catch (err) {
       console.error('TikTok Post Fehler:', describeError(err));
       await this.postLog.logAttempt({

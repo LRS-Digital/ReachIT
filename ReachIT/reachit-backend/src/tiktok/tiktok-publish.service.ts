@@ -100,11 +100,19 @@ export class TiktokPublishService {
 
   /**
    * Schritt 3: Status abfragen, bis die Verarbeitung abgeschlossen ist.
+   *
+   * Gibt die Post-ID zurueck, die TikTok in der Statusantwort mitliefert
+   * (`publicaly_available_post_id`, Schreibfehler stammt von TikTok). Die ist
+   * nicht dieselbe wie die publish_id: Letztere identifiziert den
+   * Upload-Vorgang, erstere das fertige Video. Bei privaten Posts
+   * (privacy_level SELF_ONLY) laesst TikTok das Feld unter Umstaenden weg -
+   * deshalb wird die vollstaendige Antwort geloggt, sonst laesst sich
+   * spaeter nicht nachvollziehen, was TikTok tatsaechlich gemacht hat.
    */
   async waitUntilPublished(
     publishId: string,
     accessToken: string,
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     const maxAttempts = 20;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -121,7 +129,15 @@ export class TiktokPublishService {
 
       const status = response.data.data.status;
 
-      if (status === 'PUBLISH_COMPLETE') return;
+      if (status === 'PUBLISH_COMPLETE') {
+        console.log(
+          'TikTok Publish abgeschlossen:',
+          JSON.stringify(response.data.data),
+        );
+
+        const postIds = response.data.data.publicaly_available_post_id;
+        return Array.isArray(postIds) ? String(postIds[0]) : undefined;
+      }
       if (status === 'FAILED') {
         throw new Error(
           `TikTok-Veröffentlichung fehlgeschlagen: ${JSON.stringify(response.data.data)}`,
