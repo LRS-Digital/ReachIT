@@ -193,10 +193,13 @@ export class MultiPostService {
       auftrag.text,
     );
 
+    // null heisst: Rueckfrage nicht moeglich (Scope video.list fehlt). Dann
+    // gilt PUBLISH_COMPLETE als Bestaetigung, wie vor Einfuehrung der
+    // Rueckfrage - nur ohne Link zum Video.
     return {
-      externalId: bestaetigung.externalId ?? postId ?? publishId,
-      verified: bestaetigung.verified,
-      postUrl: bestaetigung.permalink,
+      externalId: bestaetigung?.externalId ?? postId ?? publishId,
+      verified: bestaetigung ? bestaetigung.verified : true,
+      postUrl: bestaetigung?.permalink,
     };
   }
 

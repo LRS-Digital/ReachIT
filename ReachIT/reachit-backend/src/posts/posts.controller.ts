@@ -254,10 +254,15 @@ export class PostsController {
       // PUBLISH_COMPLETE ist nur TikToks Zusage, die Verarbeitung abgeschlossen
       // zu haben. Erst die Videoliste des Kontos beweist, dass das Video
       // wirklich dort liegt - und liefert nebenbei die echte Post-ID.
-      const verifyResult = await this.tiktok.verifyPost(
+      const bestaetigung = await this.tiktok.verifyPost(
         accessToken,
         caption ?? '',
       );
+
+      // Ohne den Scope video.list ist keine Rueckfrage moeglich. Dann gilt
+      // wieder PUBLISH_COMPLETE als Bestaetigung - dieselbe Aussagekraft wie
+      // vor der Rueckfrage, nur eben ohne Link zum Video.
+      const verified = bestaetigung ? bestaetigung.verified : true;
 
       await this.postLog.logAttempt({
         userId,
@@ -266,19 +271,19 @@ export class PostsController {
         mediaType: 'video',
         platform: 'tiktok',
         status: 'success',
-        externalId: verifyResult.externalId ?? postId ?? publishId,
+        externalId: bestaetigung?.externalId ?? postId ?? publishId,
         fileSizeBytes: file.size,
         mimeType: file.mimetype,
         durationMs: Date.now() - startTime,
-        verified: verifyResult.verified,
-        postUrl: verifyResult.permalink,
+        verified,
+        postUrl: bestaetigung?.permalink,
       });
 
       return res.json({
         success: true,
         publishId,
-        verified: verifyResult.verified,
-        postUrl: verifyResult.permalink,
+        verified,
+        postUrl: bestaetigung?.permalink,
       });
     } catch (err) {
       console.error('TikTok Post Fehler:', describeError(err));

@@ -183,7 +183,11 @@ export class TiktokPublishService {
   async verifyPost(
     accessToken: string,
     caption: string,
-  ): Promise<{ verified: boolean; externalId?: string; permalink?: string }> {
+  ): Promise<{
+    verified: boolean;
+    externalId?: string;
+    permalink?: string;
+  } | null> {
     try {
       const response = await axios.post(
         `${VIDEO_LIST_URL}?fields=id,title,create_time,share_url`,
@@ -218,8 +222,11 @@ export class TiktokPublishService {
         permalink: treffer.share_url,
       };
     } catch (err) {
+      // null heisst "Rueckfrage nicht moeglich" - etwa weil der Scope
+      // video.list fehlt. Der Aufrufer faellt dann auf PUBLISH_COMPLETE
+      // zurueck, statt einen erfolgreichen Post als unbestaetigt zu melden.
       console.error('TikTok Verify Fehler:', describeError(err));
-      return { verified: false };
+      return null;
     }
   }
 }
