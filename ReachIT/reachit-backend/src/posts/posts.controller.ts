@@ -360,10 +360,9 @@ export class PostsController {
         videoUrl,
       );
 
-      // Nur Videos brauchen Verarbeitungszeit, Bilder sind sofort bereit
-      if (videoUrl) {
-        await this.threads.waitUntilReady(containerId, accessToken);
-      }
+      // Gilt fuer alle Medienarten: Threads legt den Container asynchron an,
+      // ein sofortiges Veroeffentlichen scheitert mit "Media Not Found".
+      await this.threads.waitUntilReady(containerId, accessToken);
 
       const postId = await this.threads.publishContainer(
         account.platform_user_id,

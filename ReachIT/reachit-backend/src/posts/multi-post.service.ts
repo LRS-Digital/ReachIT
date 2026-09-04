@@ -149,10 +149,9 @@ export class MultiPostService {
       videoUrl,
     );
 
-    // Nur Videos brauchen Verarbeitungszeit, Bilder sind sofort bereit
-    if (videoUrl) {
-      await this.threads.waitUntilReady(containerId, auftrag.accessToken);
-    }
+    // Gilt fuer alle Medienarten: Threads legt den Container asynchron an,
+    // ein sofortiges Veroeffentlichen scheitert mit "Media Not Found".
+    await this.threads.waitUntilReady(containerId, auftrag.accessToken);
 
     const postId = await this.threads.publishContainer(
       auftrag.platformUserId,
