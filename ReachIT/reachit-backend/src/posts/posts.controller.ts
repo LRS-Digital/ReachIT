@@ -22,6 +22,7 @@ import { MultiPostService } from './multi-post.service.js';
 import type { ConnectedAccount } from '../tokens/token-refresh.service.js';
 import { PostLogService } from './post-log.service.js';
 import { describeError } from '../common/describe-error.js';
+import { erkenneMedienart } from '../common/medienart.js';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 
@@ -318,13 +319,17 @@ export class PostsController {
         .json({ error: 'Entweder Text oder ein Bild/Video wird benötigt.' });
     }
 
-    // Für das Logging brauchen wir den Media-Typ auch im Fehlerfall,
-    // deshalb außerhalb des try-Blocks bestimmen.
-    const mediaType: 'text' | 'image' | 'video' = file
-      ? file.mimetype.startsWith('video/')
-        ? 'video'
-        : 'image'
-      : 'text';
+    // Fuer das Logging brauchen wir den Media-Typ auch im Fehlerfall,
+    // deshalb ausserhalb des try-Blocks bestimmen.
+    let mediaType: MediaType;
+
+    try {
+      mediaType = file ? erkenneMedienart(file) : 'text';
+    } catch (err) {
+      return res
+        .status(400)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
 
     let connectedAccountId: string | undefined;
     const startTime = Date.now();
@@ -534,11 +539,15 @@ export class PostsController {
         .json({ error: 'Entweder Text oder eine Datei wird benötigt.' });
     }
 
-    const mediaType: MediaType = file
-      ? file.mimetype.startsWith('video/')
-        ? 'video'
-        : 'image'
-      : 'text';
+    let mediaType: MediaType;
+
+    try {
+      mediaType = file ? erkenneMedienart(file) : 'text';
+    } catch (err) {
+      return res
+        .status(400)
+        .json({ error: err instanceof Error ? err.message : String(err) });
+    }
 
     // Ein Eintrag für den gesamten Post, die Ziele hängen darunter
     const postId = await this.postLog.legePostAn({
